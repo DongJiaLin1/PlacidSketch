@@ -1,3 +1,0 @@
-C:/Users/admin/Desktop/PlacidSketch/cmake-build-debug/CMakeFiles/placidsketch.dir
-C:/Users/admin/Desktop/PlacidSketch/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Users/admin/Desktop/PlacidSketch/cmake-build-debug/CMakeFiles/rebuild_cache.dir
