@@ -1,63 +1,81 @@
 # PlacidSketch
 
-A high-performance sketch algorithm for detecting stable flows in network traffic using a three-stage architecture.
+A three-stage sketch-based system for detecting steady (long-lived) network flows. It processes traffic data window-by-window using a multi-stage pipeline, keeping memory usage low through hash-based sketch techniques.
 
 ## Overview
 
-PlacidSketch is designed to identify stable network flows (flows that appear consistently across multiple time windows) with minimal memory usage. It uses a three-stage pipeline:
+PlacidSketch uses a three-stage pipeline:
 
-1. **Stage1 (Stage1Filter)**: Quick candidate selection based on flow continuity
-2. **Stage2 (Stage2Monitor)**: Detailed stability monitoring using counter-based analysis
-3. **Stage3 (Stage3Merger)**: Merging consecutive stable subflows
+```
+.dat files (one per time window)
+        |
+        v
+   Stage1Filter    -- Quick candidate filtering via per-window arrival tracking
+        |
+        v
+   Stage2Monitor   -- Stability monitoring with ring-buffer counters
+        |
+        v
+   Stage3Merger    -- Merges consecutive stable subflows, reports final results
+```
+
+Each flow is represented by a 32-bit identifier. Stage1 uses 3 hash rows; Stage2 uses 2 rows with a ring buffer of 6 counters per row; Stage3 uses a CM-sketch-style merger with variance-based stability merging.
 
 ## Building
 
 ```bash
-mkdir build && cd build
+mkdir build
+cd build
 cmake ..
-make
+cmake --build .
 ```
 
-## Usage
+Or with a single command:
 
 ```bash
-./placidsketch [data_folder_path]
+cmake -B build -S . && cmake --build build
 ```
 
-## Input Data Format
+## Running
 
-The program expects CSV files in the specified folder:
-- Each file represents one time window
-- Files are sorted by name (e.g., `window_0000.csv`, `window_0001.csv`, ...)
-- Each CSV file should have a header row
-- The **second column** contains the flow fingerprint (16-character hex string, e.g., `6da9ea4534f1ef71`)
-
-## Output
-
-The program outputs:
-- Total number of time windows and packets processed
-- Number of detected stable flows
-- Memory configuration for each stage
-
-## Parameters
-
-Key parameters (defined in `parm.h`):
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `STAGE1_MEMORY_BYTES` | 25 KB | Memory for Stage1 |
-| `STAGE2_MEMORY_BYTES` | 275 KB | Memory for Stage2 |
-| `STAGE3_MEMORY_BYTES` | 100 KB | Memory for Stage3 |
-| `SUBFLOW_WINDOWS` | 5 | Windows per subflow |
-| `STABLE_THRESHOLD` | 3.0 | Variance threshold for stability |
-
-## Architecture
-
-```
-Packet → Stage1Filter → Stage2Monitor → Stage3Merger → Stable Flow Output
-         (Continuity)   (Stability)    (Merging)
+```bash
+./build/placidsketch <data_folder_path>
 ```
 
-## License
+## Input Format
 
-MIT License
+Each `.dat` file represents one time window. Files are processed in lexicographic order by filename. Each file is treated as a stream of 32-bit binary records, where each record is a flow identifier. File size must be a multiple of 4 bytes.
+
+## Configuration
+
+All key parameters are in `parm.h`:
+
+
+| Parameter             | Default | Description                            |
+| --------------------- | ------- | -------------------------------------- |
+| `STAGE1_MEMORY_BYTES` | 80 KB   | Stage1 bucket memory                   |
+| `STAGE2_MEMORY_BYTES` | 220 KB  | Stage2 bucket memory                   |
+| `STAGE3_MEMORY_BYTES` | 100 KB  | Stage3 merger memory                   |
+| `SUBFLOW_WINDOWS`     | 5       | Windows per subflow                    |
+| `MIN_SUBFLOWS`        | 40      | Subflows needed for stability          |
+| `Steady_FLOWS`        | 200     | Total subflows to report a stable flow |
+| `STABLE_THRESHOLD`    | 3.0     | Variance threshold for merging         |
+| `ALPHA_THRESHOLD`     | 5       | Counter difference threshold           |
+
+
+## Project Structure
+
+```
+.
+├── CMakeLists.txt
+├── MurmurHash3.h          # MurmurHash3_x86_32 implementation
+├── parm.h                 # All configurable constants and Packet struct
+├── stage1.h               # Stage1: candidate filter
+├── stage2.h               # Stage2: stability monitor
+├── stage3.h               # Stage3: subflow merger
+└── main.cpp               # Entry point, data loader, sketch orchestration
+```
+
+## Dependencies
+
+A C++17 compiler and CMake 3.15+. No third-party libraries required.
